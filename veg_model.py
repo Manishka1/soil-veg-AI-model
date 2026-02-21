@@ -4,19 +4,40 @@ import numpy as np
 from PIL import Image
 
 def load_veg_model():
-    model = torch.load(
+
+    checkpoint = torch.load(
         "models/veg_unet_lite.pth",
-        map_location=torch.device("cpu")
+        map_location="cpu",
+        weights_only=False  # required for torch 2.6+
     )
+
+    # If full model was saved
+    if isinstance(checkpoint, torch.nn.Module):
+        model = checkpoint
+
+    # If state_dict was saved
+    elif isinstance(checkpoint, dict):
+        # ⚠️ You must recreate architecture here
+        # Replace this with your actual UNet class
+        from your_unet_file import UNetLite   # <-- change this
+
+        model = UNetLite()
+        model.load_state_dict(checkpoint)
+
+    else:
+        raise ValueError("Unknown model format")
+
     model.eval()
     return model
 
+
 def preprocess_veg_image(image):
     transform = transforms.Compose([
-        transforms.Resize((256, 256)),  # match training size
+        transforms.Resize((256, 256)),
         transforms.ToTensor(),
     ])
     return transform(image).unsqueeze(0)
+
 
 def predict_vegetation(model, image):
     input_tensor = preprocess_veg_image(image)
@@ -26,8 +47,6 @@ def predict_vegetation(model, image):
         output = torch.sigmoid(output)
 
     mask = output.squeeze().cpu().numpy()
-
-    # Convert to binary mask
     binary_mask = (mask > 0.5).astype(np.uint8)
 
     vegetation_percentage = (
