@@ -6,9 +6,9 @@ import numpy as np
 from PIL import Image
 
 
-# =====================================
-# EXACT TRAINING ARCHITECTURE
-# =====================================
+# ==========================================
+# EXACT ARCHITECTURE FROM TRAINING NOTEBOOK
+# ==========================================
 
 class DoubleConv(nn.Module):
     def __init__(self, i, o):
@@ -60,16 +60,15 @@ class UNetLite(nn.Module):
         x = F.interpolate(x, scale_factor=2)
         x = self.u1(torch.cat([x, d1], 1))
 
-        # IMPORTANT: training used sigmoid here
+        # Sigmoid was used during training
         return torch.sigmoid(self.out(x))
 
 
-# =====================================
+# ==========================================
 # LOAD MODEL
-# =====================================
+# ==========================================
 
 def load_veg_model():
-
     model = UNetLite()
 
     state_dict = torch.load(
@@ -83,40 +82,40 @@ def load_veg_model():
     return model
 
 
-# =====================================
+# ==========================================
 # PREPROCESS (MATCH TRAINING)
-# =====================================
+# ==========================================
 
 def preprocess_veg_image(image):
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
-        transforms.ToTensor(),   # scales to 0–1 (correct)
+        transforms.ToTensor(),  # scales 0–255 → 0–1
     ])
     return transform(image).unsqueeze(0)
 
 
-# =====================================
-# PREDICTION
-# =====================================
+# ==========================================
+# PREDICTION (POLARITY FIXED)
+# ==========================================
 
 def predict_vegetation(model, image):
 
     input_tensor = preprocess_veg_image(image)
 
     with torch.no_grad():
-        output = model(input_tensor)  # sigmoid already applied
+        output = model(input_tensor)
 
     mask = output.squeeze().cpu().numpy()
 
-    # 🔥 Use calibrated threshold (0.3 works better for BCE+Dice)
-    threshold = 0.3
-    binary_mask = (mask > threshold).astype(np.uint8)
+    # 🔥 IMPORTANT FIX:
+    # Model learned inverted polarity during training
+    # So vegetation corresponds to LOWER values
+    binary_mask = (mask < 0.5).astype(np.uint8)
 
     vegetation_percentage = (
         np.sum(binary_mask) / binary_mask.size * 100
     )
 
-    # Convert to displayable image
     mask_image = Image.fromarray(
         (binary_mask * 255).astype(np.uint8)
     )
