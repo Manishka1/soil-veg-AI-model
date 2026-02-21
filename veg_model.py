@@ -6,9 +6,9 @@ import numpy as np
 from PIL import Image
 
 
-# ----------------------------------
-# EXACT SAME ARCHITECTURE AS TRAINING
-# ----------------------------------
+# =====================================
+# EXACT TRAINING ARCHITECTURE
+# =====================================
 
 class DoubleConv(nn.Module):
     def __init__(self, i, o):
@@ -60,12 +60,13 @@ class UNetLite(nn.Module):
         x = F.interpolate(x, scale_factor=2)
         x = self.u1(torch.cat([x, d1], 1))
 
+        # IMPORTANT: training used sigmoid here
         return torch.sigmoid(self.out(x))
 
 
-# ----------------------------------
+# =====================================
 # LOAD MODEL
-# ----------------------------------
+# =====================================
 
 def load_veg_model():
 
@@ -82,35 +83,40 @@ def load_veg_model():
     return model
 
 
-# ----------------------------------
-# PREPROCESS
-# ----------------------------------
+# =====================================
+# PREPROCESS (MATCH TRAINING)
+# =====================================
 
 def preprocess_veg_image(image):
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
-        transforms.ToTensor(),
+        transforms.ToTensor(),   # scales to 0–1 (correct)
     ])
     return transform(image).unsqueeze(0)
 
 
-# ----------------------------------
-# PREDICT
-# ----------------------------------
+# =====================================
+# PREDICTION
+# =====================================
 
 def predict_vegetation(model, image):
+
     input_tensor = preprocess_veg_image(image)
 
     with torch.no_grad():
-        output = model(input_tensor)
+        output = model(input_tensor)  # sigmoid already applied
 
     mask = output.squeeze().cpu().numpy()
-    binary_mask = (mask > 0.5).astype(np.uint8)
+
+    # 🔥 Use calibrated threshold (0.3 works better for BCE+Dice)
+    threshold = 0.3
+    binary_mask = (mask > threshold).astype(np.uint8)
 
     vegetation_percentage = (
         np.sum(binary_mask) / binary_mask.size * 100
     )
 
+    # Convert to displayable image
     mask_image = Image.fromarray(
         (binary_mask * 255).astype(np.uint8)
     )
