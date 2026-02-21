@@ -2,29 +2,26 @@ import torch
 import torch.nn as nn
 from torchvision import models, transforms
 
-# IMPORTANT: must match your Roboflow class order
 SOIL_CLASSES = ["alluvial", "black", "clay", "red"]
 
 def load_soil_model():
 
-    # Recreate MobileNetV3 exactly like training
     model = models.mobilenet_v3_small(weights=None)
 
-    # Replace final classifier layer
     model.classifier[3] = nn.Linear(
         model.classifier[3].in_features,
         len(SOIL_CLASSES)
     )
 
-    # Load weights (state_dict)
     state_dict = torch.load(
         "models/soil_classifier.pth",
-        map_location="cpu"
+        map_location="cpu",
+        weights_only=False   # 🔥 important for torch 2.6+
     )
 
     model.load_state_dict(state_dict)
-
     model.eval()
+
     return model
 
 
