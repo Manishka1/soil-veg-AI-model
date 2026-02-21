@@ -1,27 +1,18 @@
 import torch
-import torch.nn as nn
-from torchvision import models, transforms
+from torchvision import transforms
 
 SOIL_CLASSES = ["alluvial", "black", "clay", "red"]
 
 def load_soil_model():
 
-    model = models.mobilenet_v3_small(weights=None)
-
-    model.classifier[3] = nn.Linear(
-        model.classifier[3].in_features,
-        len(SOIL_CLASSES)
-    )
-
-    state_dict = torch.load(
+    # IMPORTANT: must disable weights_only in torch 2.6+
+    model = torch.load(
         "models/soil_classifier.pth",
         map_location="cpu",
-        weights_only=False   # 🔥 important for torch 2.6+
+        weights_only=False
     )
 
-    model.load_state_dict(state_dict)
     model.eval()
-
     return model
 
 
